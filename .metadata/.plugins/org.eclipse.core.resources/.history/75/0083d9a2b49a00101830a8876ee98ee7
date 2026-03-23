@@ -1,0 +1,70 @@
+package com.example.demo.config;
+
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
+import org.springframework.stereotype.Component;
+
+import jakarta.servlet.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@Component
+@Order(Ordered.HIGHEST_PRECEDENCE)
+public class CorsFilter implements Filter {
+
+    @Override
+    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain) 
+            throws IOException, ServletException {
+        
+        HttpServletResponse response = (HttpServletResponse) res;
+        HttpServletRequest request = (HttpServletRequest) req;
+
+        // Set CORS headers
+        response.setHeader("Access-Control-Allow-Origin", getAllowedOrigin(request));
+        response.setHeader("Access-Control-Allow-Methods", "POST, GET, PUT, OPTIONS, DELETE, PATCH");
+        response.setHeader("Access-Control-Max-Age", "3600");
+        response.setHeader("Access-Control-Allow-Headers", 
+            "Content-Type, Authorization, X-Requested-With, Accept, Origin");
+        response.setHeader("Access-Control-Allow-Credentials", "true");
+        response.setHeader("Access-Control-Expose-Headers", 
+            "Authorization, Content-Type, X-Requested-With, Accept, Origin");
+
+        // Handle preflight OPTIONS request
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            return;
+        }
+
+        chain.doFilter(req, res);
+    }
+
+    private String getAllowedOrigin(HttpServletRequest request) {
+        String origin = request.getHeader("Origin");
+        
+        // List of allowed origins
+        String[] allowedOrigins = {
+            "http://localhost:3000",
+            "http://localhost:4200",
+            "http://localhost:8080",
+            "https://yourfrontenddomain.com"
+        };
+
+        if (origin != null) {
+            for (String allowedOrigin : allowedOrigins) {
+                if (origin.equals(allowedOrigin)) {
+                    return origin;
+                }
+            }
+        }
+        
+        // Default fallback (be cautious with * in production)
+        return "*";
+    }
+
+    @Override
+    public void init(FilterConfig filterConfig) {}
+
+    @Override
+    public void destroy() {}
+}

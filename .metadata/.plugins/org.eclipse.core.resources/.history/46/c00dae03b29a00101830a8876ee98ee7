@@ -1,0 +1,112 @@
+package com.Ecom.Java.Services;
+
+import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+import com.Ecom.Java.Entity.JwtRequest;
+import com.Ecom.Java.Entity.JwtResponse;
+import com.Ecom.Java.Entity.User;
+import com.Ecom.Java.Repo.UserDao;
+import com.Ecom.Java.jwtUtil.JwtUtil;
+
+import ch.qos.logback.classic.Logger;
+
+// Alternative implementation using Java 21 features more extensively
+@Service
+public class JwtService implements UserDetailsService {
+
+	private static final org.slf4j.Logger logger = LoggerFactory.getLogger(JwtService.class);
+
+	private final JwtUtil jwtUtil;
+	private final UserDao userDao;
+	private final AuthenticationManager authenticationManager;
+
+	public JwtService(JwtUtil jwtUtil, UserDao userDao, AuthenticationManager authenticationManager) {
+		this.jwtUtil = jwtUtil;
+		this.userDao = userDao;
+		this.authenticationManager = authenticationManager;
+	}
+
+	// Using pattern matching for instanceof (Java 21 feature)
+	public JwtResponse createJwtToken(JwtRequest jwtRequest) {
+		var credentials = new AuthCredentials(jwtRequest.getUserName(), jwtRequest.getUserPassword());
+
+		logger.debug("Creating JWT token for user: {}", credentials.username());
+
+		return switch (authenticateUser(credentials)) {
+		case AuthResult.Success success -> {
+			var userDetails = loadUserByUsername(success.username());
+			var token = jwtUtil.generateToken(userDetails);
+			var user = findUserOrThrow(success.username());
+
+			logger.debug("JWT token created successfully for user: {}", success.username());
+			yield new JwtResponse(user, token);
+		}
+		case AuthResult.Failure failure -> {
+			logger.warn("Authentication failed: {}", failure.reason());
+			throw new RuntimeException(failure.reason());
+		}
+		};
+	}
+
+	@Override
+	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+		logger.debug("Loading user by username: {}", username);
+
+		return userDao.findById(username).map(this::createUserDetails)
+				.orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+	}
+
+	private UserDetails createUserDetails(User user) {
+        var authorities = user.getRole()
+            .stream()
+            .map(role -> new SimpleGrantedAuthority(STR."ROLE_\{role.getRoleName()}")) // String templates
+            .collect(Collectors.toSet());
+
+        return new org.springframework.security.core.userdetails.User(
+            user.getUserName(),
+            user.getUserPassword(),
+            authorities
+        );
+    }
+
+	private AuthResult authenticateUser(AuthCredentials credentials) {
+		try {
+			authenticationManager.authenticate(
+					new UsernamePasswordAuthenticationToken(credentials.username(), credentials.password()));
+			logger.debug("Authentication successful for user: {}", credentials.username());
+			return new AuthResult.Success(credentials.username());
+		} catch (DisabledException e) {
+			logger.warn("User account disabled: {}", credentials.username());
+			return new AuthResult.Failure("USER_DISABLED");
+		} catch (BadCredentialsException e) {
+			logger.warn("Invalid credentials for user: {}", credentials.username());
+			return new AuthResult.Failure("INVALID_CREDENTIALS");
+		}
+	}
+
+	private User findUserOrThrow(String username) {
+		return userDao.findById(username)
+				.orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+	}
+
+	// Record classes for better data modeling (Java 14+, enhanced in Java 21)
+	public record AuthCredentials(String username, String password) {
+	}
+
+	// Sealed classes for representing authentication results (Java 17+)
+	public sealed interface AuthResult permits AuthResult.Success, AuthResult.Failure {
+		record Success(String username) implements AuthResult {
+		}
+
+		record Failure(String reason) implements AuthResult {
+		}
+	}
+}

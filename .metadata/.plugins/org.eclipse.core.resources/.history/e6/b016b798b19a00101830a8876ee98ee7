@@ -1,0 +1,12 @@
+package com.Ecom.Java.Repo;
+
+import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.stereotype.Repository;
+
+import com.Ecom.Java.Entity.Role;
+
+@Repository
+public interface RoleDao extends MongoRepository<Role, String> {
+    // You can add custom queries here if needed
+    // Example: Role findByRoleDescription(String description);
+}

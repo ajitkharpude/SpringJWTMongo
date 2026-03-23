@@ -1,0 +1,33 @@
+package com.example.demo.Entity;
+
+import java.util.Set;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.mapping.DBRef;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import com.Ecom.Java.Entity.Role;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
+
+@Document(collection = "users")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@ToString
+public class User {
+
+    @Id
+    private String userName;       // Acts as _id in Mongo
+    private String userFirstName;
+    private String userLastName;
+    private String userPassword;
+
+    @DBRef
+    private Set<Role> role;        // Reference to roles collection
+}

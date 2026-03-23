@@ -1,0 +1,101 @@
+package com.example.demo.Services;
+
+import com.example.demo.Repository.RoleRepository;
+import com.example.demo.Repository.UserRepository;
+import com.example.demo.Entity.Role;
+import com.example.demo.Entity.User;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Optional;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    public void initRoleAndUser() {
+        // Create Admin Role if not exists
+        Optional<Role> existingAdminRole = roleRepository.findByRoleName("Admin");
+        Role adminRole;
+        if (existingAdminRole.isEmpty()) {
+            adminRole = new Role();
+            adminRole.setRoleName("Admin");
+            adminRole.setRoleDescription("Admin role");
+            adminRole = roleRepository.save(adminRole);
+        } else {
+            adminRole = existingAdminRole.get();
+        }
+
+        // Create User Role if not exists
+        Optional<Role> existingUserRole = roleRepository.findByRoleName("User");
+        Role userRole;
+        if (existingUserRole.isEmpty()) {
+            userRole = new Role();
+            userRole.setRoleName("User");
+            userRole.setRoleDescription("Default role for newly created record");
+            userRole = roleRepository.save(userRole);
+        } else {
+            userRole = existingUserRole.get();
+        }
+
+        // Create Admin User if not exists
+        if (!userRepository.existsByUserName("admin")) {
+            User adminUser = new User();
+            adminUser.setUserName("admin");
+            adminUser.setUserPassword(getEncodedPassword("admin"));
+            adminUser.setUserFirstName("admin");
+            adminUser.setUserLastName("admin");
+            Set<Role> adminRoles = new HashSet<>();
+            adminRoles.add(adminRole);
+            adminUser.setRole(adminRoles);
+            userRepository.save(adminUser);
+        }
+
+        // Create Default User if not exists
+        if (!userRepository.existsByUserName("ajit")) {
+            User user = new User();
+            user.setUserName("ajit");
+            user.setUserPassword(getEncodedPassword("ajit"));
+            user.setUserFirstName("ajit");
+            user.setUserLastName("kharpude");
+            Set<Role> userRoles = new HashSet<>();
+            userRoles.add(userRole);
+            user.setRole(userRoles);
+            userRepository.save(user);
+        }
+    }
+
+    public User registerNewUser(User user) {
+        Optional<Role> roleOptional = roleRepository.findByRoleName("User");
+        if (roleOptional.isEmpty()) {
+            throw new RuntimeException("Default User role not found. Please initialize roles first.");
+        }
+        
+        Role role = roleOptional.get();
+        Set<Role> userRoles = new HashSet<>();
+        userRoles.add(role);
+        user.setRole(userRoles);
+        user.setUserPassword(getEncodedPassword(user.getUserPassword()));
+
+        return userRepository.save(user);
+    }
+
+    public String getEncodedPassword(String password) {
+        return passwordEncoder.encode(password);
+    }
+
+    public Optional<User> findByUserName(String userName) {
+        return userRepository.findByUserName(userName);
+    }
+}

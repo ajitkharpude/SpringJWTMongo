@@ -1,0 +1,88 @@
+package com.Ecom.Java.Services;
+
+import java.util.HashSet;
+import java.util.Set;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import com.Ecom.Java.Entity.Role;
+import com.Ecom.Java.Entity.User;
+import com.Ecom.Java.Repo.RoleDao;
+import com.Ecom.Java.Repo.UserDao;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserDao userDao;
+
+    @Autowired
+    private RoleDao roleDao;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    /**
+     * Initializes default roles and users in MongoDB safely.
+     */
+    public void initRoleAndUser() {
+        // --- Create roles if not exists ---
+        Role adminRole = roleDao.findById("Admin").orElseGet(() -> roleDao.save(new Role("Admin", "Admin role")));
+        Role userRole = roleDao.findById("User").orElseGet(() -> roleDao.save(new Role("User", "Default role for newly created record")));
+
+        // --- Create admin user if not exists ---
+        if (!userDao.existsById("admin")) {
+            User adminUser = new User();
+            adminUser.setUserName("admin");
+            adminUser.setUserPassword(getEncodedPassword("admin"));
+            adminUser.setUserFirstName("admin");
+            adminUser.setUserLastName("admin");
+
+            Set<Role> adminRoles = new HashSet<>();
+            adminRoles.add(adminRole);
+            adminUser.setRole(adminRoles);
+
+            userDao.save(adminUser);
+        }
+
+        // --- Create default user if not exists ---
+        if (!userDao.existsById("ajit")) {
+            User user = new User();
+            user.setUserName("ajit");
+            user.setUserPassword(getEncodedPassword("ajit"));
+            user.setUserFirstName("ajit");
+            user.setUserLastName("kharpude");
+
+            Set<Role> userRoles = new HashSet<>();
+            userRoles.add(userRole);
+            user.setRole(userRoles);
+
+            userDao.save(user);
+        }
+    }
+
+    /**
+     * Register new user with default "User" role
+     */
+    public User registerNewUser(User user) {
+        Role role = roleDao.findById("User")
+            .orElseThrow(() -> new RuntimeException("Default role not found"));
+
+        Set<Role> userRoles = new HashSet<>();
+        userRoles.add(role);
+
+        user.setRole(userRoles);
+        user.setUserPassword(getEncodedPassword(user.getUserPassword()));
+
+        return userDao.save(user);
+    }
+
+    /**
+     * Encode raw password
+     */
+    public String getEncodedPassword(String password) {
+        return passwordEncoder.encode(password);
+    }
+}

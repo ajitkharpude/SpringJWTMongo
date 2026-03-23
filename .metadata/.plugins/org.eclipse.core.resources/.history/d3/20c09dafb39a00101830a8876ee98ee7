@@ -1,0 +1,89 @@
+package com.example.demo.Controller;
+
+import com.example.demo.Entity.JwtRequest;
+import com.example.demo.Entity.JwtResponse;
+import com.example.demo.Services.JwtService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@CrossOrigin(origins = "*", maxAge = 3600)
+public class JwtController {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtController.class);
+
+    @Autowired
+    private JwtService jwtService;
+
+    @PostMapping("/authenticate")
+    public ResponseEntity<?> createJwtToken(@Valid @RequestBody JwtRequest jwtRequest) {
+        try {
+            logger.info("Authentication request received for user: {}", jwtRequest.getUserName());
+            JwtResponse jwtResponse = jwtService.createJwtToken(jwtRequest);
+            return ResponseEntity.ok(jwtResponse);
+        } catch (Exception e) {
+            logger.error("Authentication failed: {}", e.getMessage());
+            return createErrorResponse("Authentication failed: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshJwtToken(HttpServletRequest request) {
+        try {
+            String token = extractTokenFromRequest(request);
+            if (token == null) {
+                return createErrorResponse("Token not provided", HttpStatus.BAD_REQUEST);
+            }
+            
+            JwtResponse jwtResponse = jwtService.refreshJwtToken(token);
+            return ResponseEntity.ok(jwtResponse);
+        } catch (Exception e) {
+            logger.error("Token refresh failed: {}", e.getMessage());
+            return createErrorResponse("Token refresh failed: " + e.getMessage(), HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    @GetMapping("/validate-token")
+    public ResponseEntity<?> validateToken(HttpServletRequest request) {
+        try {
+            String token = extractTokenFromRequest(request);
+            if (token == null) {
+                return createErrorResponse("Token not provided", HttpStatus.BAD_REQUEST);
+            }
+            
+            // Token validation logic would go here
+            Map<String, Object> response = new HashMap<>();
+            response.put("valid", true);
+            response.put("message", "Token is valid");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return createErrorResponse("Token validation failed", HttpStatus.UNAUTHORIZED);
+        }
+    }
+
+    private String extractTokenFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+
+    private ResponseEntity<Map<String, Object>> createErrorResponse(String message, HttpStatus status) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("error", true);
+        errorResponse.put("message", message);
+        errorResponse.put("status", status.value());
+        errorResponse.put("timestamp", System.currentTimeMillis());
+        return ResponseEntity.status(status).body(errorResponse);
+    }
+}

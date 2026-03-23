@@ -1,0 +1,42 @@
+package com.example.demo.controller;
+
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/test")
+public class CorsTestController {
+
+    @GetMapping("/cors")
+    public String testCors() {
+        return "CORS is working correctly!";
+    }
+
+    @PostMapping("/cors")
+    public String testCorsPost(@RequestBody String data) {
+        return "CORS POST is working with data: " + data;
+    }
+
+    @OptionsMapping("/cors")
+    public String handleOptions() {
+        return "OPTIONS request handled";
+    }
+}
+
+/*
+To test CORS, you can use these curl commands:
+
+# Test GET request
+curl -X GET -H "Origin: http://localhost:3000" -v http://localhost:8080/api/test/cors
+
+# Test OPTIONS preflight request
+curl -X OPTIONS -H "Origin: http://localhost:3000" \
+     -H "Access-Control-Request-Method: POST" \
+     -H "Access-Control-Request-Headers: Content-Type" \
+     -v http://localhost:8080/api/test/cors
+
+# Test POST request with CORS
+curl -X POST -H "Origin: http://localhost:3000" \
+     -H "Content-Type: application/json" \
+     -d '{"test": "data"}' \
+     -v http://localhost:8080/api/test/cors
+*/

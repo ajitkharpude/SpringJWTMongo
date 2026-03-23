@@ -1,0 +1,62 @@
+# ==============================
+# Spring Boot Application Config
+# ==============================
+spring.application.name=SpringJWTMongo
+server.port=8080
+
+# ==============================
+# MongoDB Configuration
+# ==============================
+spring.mongodb.uri=mongodb://localhost:27017/jwt_mongo_db
+
+# ==============================
+# Spring Security
+# ==============================
+spring.security.user.name=admin
+spring.security.user.password=admin
+
+# ==============================
+# JWT Configuration
+# ==============================
+jwt.secret=mySecretKeyThatIsAtLeast32CharactersLongForHS256Algorithm!@#$%
+jwt.expiration=1800000
+
+# ==============================
+# Logging Configuration
+# ==============================
+logging.config=classpath:log4j2.xml
+logging.level.com.example.jwtmongosecurity=DEBUG
+logging.level.org.springframework.security=DEBUG
+logging.level.org.springframework.web=INFO
+logging.level.org.mongodb.driver=INFO
+logging.level.io.jsonwebtoken=INFO
+logging.file.name=logs/springjwtmongo.log
+logging.pattern.file=%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{requestId}] [%X{username}] - %msg%n
+logging.pattern.console=%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} [%X{requestId}] [%X{username}] - %msg%n
+logging.level.root=INFO
+logging.level.com.yourpackage=INFO
+# ==============================
+# Graylog Configuration
+# ==============================
+graylog.host=test.clouzer.com
+graylog.port=5010
+graylog.environment=development
+
+# ==============================
+# Actuator Configuration
+# ==============================
+management.endpoints.web.exposure.include=health,info,metrics,loggers
+management.endpoint.health.show-details=always
+management.info.env.enabled=true
+
+# Disable JMX completely
+spring.jmx.enabled=false
+spring.application.admin.enabled=false
+# ==============================
+# Application Info
+# ==============================
+info.app.name=SpringJWTMongo
+info.app.description=Spring Boot JWT Authentication with MongoDB
+info.app.version=1.0.0
+info.app.encoding=@project.build.sourceEncoding@
+info.java.version=@java.version@

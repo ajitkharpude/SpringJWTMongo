@@ -1,0 +1,142 @@
+package com.example.demo.Services;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.example.demo.Entity.JwtRequest;
+import com.example.demo.Entity.JwtResponse;
+import com.example.demo.jwtUtil.JwtUtil;
+import com.example.demo.Repository.UserRepository;
+import com.example.demo.Entity.User;
+import com.example.demo.Entity.Role;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Optional;
+
+@Service
+public class JwtService implements UserDetailsService {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private AuthenticationManager authenticationManager;
+
+    public JwtResponse createJwtToken(JwtRequest jwtRequest) throws Exception {
+        String userName = jwtRequest.getUserName();
+        String userPassword = jwtRequest.getUserPassword();
+        
+        logger.info("Attempting authentication for user: {}", userName);
+        
+        authenticate(userName, userPassword);
+
+        UserDetails userDetails = loadUserByUsername(userName);
+        String newGeneratedToken = jwtUtil.generateToken(userDetails);
+        
+        Optional<User> userOptional = userRepository.findByUserName(userName);
+        if (userOptional.isEmpty()) {
+            throw new UsernameNotFoundException("User not found: " + userName);
+        }
+        
+        User user = userOptional.get();
+        logger.info("JWT token generated successfully for user: {}", userName);
+        
+        return new JwtResponse(user, newGeneratedToken);
+    }
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        logger.debug("Loading user by username: {}", username);
+        
+        Optional<User> userOptional = userRepository.findByUserName(username);
+
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            Set<SimpleGrantedAuthority> authorities = getAuthority(user);
+            
+            logger.debug("User found: {} with authorities: {}", username, authorities);
+            
+            return new org.springframework.security.core.userdetails.User(
+                user.getUserName(), 
+                user.getUserPassword(),
+                true, // enabled
+                true, // accountNonExpired
+                true, // credentialsNonExpired
+                true, // accountNonLocked
+                authorities
+            );
+        } else {
+            logger.error("User not found with username: {}", username);
+            throw new UsernameNotFoundException("User not found with username: " + username);
+        }
+    }
+
+    private Set<SimpleGrantedAuthority> getAuthority(User user) {
+        Set<SimpleGrantedAuthority> authorities = new HashSet<>();
+        if (user.getRole() != null && !user.getRole().isEmpty()) {
+            user.getRole().forEach(role -> {
+                authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getRoleName()));
+                logger.debug("Added authority: ROLE_{}", role.getRoleName());
+            });
+        } else {
+            logger.warn("User {} has no roles assigned", user.getUserName());
+        }
+        return authorities;
+    }
+
+    private void authenticate(String userName, String userPassword) throws Exception {
+        try {
+            authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(userName, userPassword)
+            );
+            logger.info("Authentication successful for user: {}", userName);
+        } catch (DisabledException e) {
+            logger.error("User account is disabled: {}", userName);
+            throw new Exception("USER_DISABLED", e);
+        } catch (BadCredentialsException e) {
+            logger.error("Invalid credentials for user: {}", userName);
+            throw new Exception("INVALID_CREDENTIALS", e);
+        } catch (Exception e) {
+            logger.error("Authentication failed for user: {} - {}", userName, e.getMessage());
+            throw new Exception("AUTHENTICATION_FAILED", e);
+        }
+    }
+
+    // Additional method for token refresh
+    public JwtResponse refreshJwtToken(String token) throws Exception {
+        try {
+            if (jwtUtil.canTokenBeRefreshed(token)) {
+                String refreshedToken = jwtUtil.refreshToken(token);
+                String username = jwtUtil.getUsernameFromToken(token);
+                
+                Optional<User> userOptional = userRepository.findByUserName(username);
+                if (userOptional.isEmpty()) {
+                    throw new UsernameNotFoundException("User not found: " + username);
+                }
+                
+                return new JwtResponse(userOptional.get(), refreshedToken);
+            } else {
+                throw new Exception("TOKEN_CANNOT_BE_REFRESHED");
+            }
+        } catch (Exception e) {
+            logger.error("Token refresh failed: {}", e.getMessage());
+            throw new Exception("TOKEN_REFRESH_FAILED", e);
+        }
+    }
+}
